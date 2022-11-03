@@ -66,31 +66,26 @@ public class Chess {
             //       Forth character is the to file
             //       Fifth character is the to rank
             //       Sixth character is the promotion of a pawn to a piece type. This is optional
-            String move = inputReader.readLine();
-            Pattern movePattern = Pattern.compile("^[a-h][1-8][-x][a-h][1-8][rnbqRNBQ]{0,1}");
-            Matcher moveMatcher = movePattern.matcher(move);
-            if(!moveMatcher.find()) {
+            
+            
+            Move m = new Move(inputReader.readLine());
+            
+            if(!m.valid()) {
                 //Move is invalid;
                 System.out.println("Move is invalid. Please input a valid move.");
                 continue;
             }
-
-            Square fromSquare = new Square();
-            fromSquare.setFileIndex(calcFileIndex(move.charAt(0)));
-            fromSquare.setRankIndex(calcRankIndex(Integer.valueOf(move.substring(1,2))));
-            boolean capture = (move.charAt(2) == 'x');
-            int toFileIndex = calcFileIndex(move.charAt(3));
-            int toRankIndex = calcRankIndex(Integer.valueOf(move.substring(4,5)));
-
-            String pawnPromotionPiece = null;
-            if(move.length() == 6) {
-                pawnPromotionPiece = move.substring(5,6);
-            }
             
-            if(!capture) {
-                movePiece(fromSquare, toFileIndex, toRankIndex, pawnPromotionPiece);
+            if(!m.capture) {
+                Errors gamestate = movePiece(m);
+                if(gamestate != Errors.GoodMove) {
+                	System.out.println(gamestate.toString());
+                }
             } else {
-                capturePiece(fromSquare.getFileIndex(), fromSquare.getRankIndex(), toFileIndex, toRankIndex, pawnPromotionPiece);
+            	Errors gamestate = capturePiece(m);
+                if(gamestate != Errors.GoodMove) {
+                	System.out.println(gamestate.toString());
+                }
             }
             // We are not going to worry about special moves like castling and en passant
         }
@@ -99,82 +94,75 @@ public class Chess {
         System.out.println("Thanks for playing!");
     }
 
-    private void movePiece(Square fromSquare, int toFileIndex, int toRankIndex, String pawnPromotionPiece) {
-        int fromFileIndex = fromSquare.getFileIndex();
-        int fromRankIndex = fromSquare.getRankIndex();
+    private Errors movePiece(Move m) {
+    	
+    	int fromFileIndex = m.startFile;
+    	int fromRankIndex = m.startRank;
+    	int toFileIndex = m.endFile;
+    	int toRankIndex = m.endRank;
+    	String pawnPromotionPiece = m.promotionPiece;
+    	
         Piece fromPiece = board[fromRankIndex][fromFileIndex];
 
         if(fromPiece == null) {
-            System.out.println("Select a square with a piece.");
-            return;
+            return Errors.NoPieceSelected;
         }
 
-        if (correctPlayerNotMovingTheirPiece(fromPiece)) return;
+        if (correctPlayerNotMovingTheirPiece(fromPiece)) return Errors.WrongPlayerMovingPiece;
 
         //Validate Piece Movement
         if(fromPiece.toString().equalsIgnoreCase("n")) {
             if (!((Math.abs(fromFileIndex - toFileIndex) == 2 && Math.abs(fromRankIndex - toRankIndex) == 1) || (Math.abs(fromFileIndex - toFileIndex) == 1 && Math.abs(fromRankIndex - toRankIndex) == 2))) {
-                System.out.println("Invalid move for Knight.");
-                return;
+                return Errors.InvalidKnightMove;
             }
         } else if(fromPiece.toString().equalsIgnoreCase("r")) {
-            validateRookMove(toFileIndex, toRankIndex, fromFileIndex, fromRankIndex);
-            return;
+            return validateRookMove(toFileIndex, toRankIndex, fromFileIndex, fromRankIndex);
         } else if(fromPiece.toString().equalsIgnoreCase("b")) {
             if(fromFileIndex == toFileIndex || toRankIndex == fromRankIndex) {
-                System.out.println("Cannot create valid path for Bishop.");
-                return;
+                return Errors.InvalidBishopPath;
             } else if(Math.abs(fromFileIndex- toFileIndex) != Math.abs(fromRankIndex- toRankIndex)) {
-                System.out.println("Cannot create valid path for Bishop.");
-                return;
+                return Errors.InvalidBishopPath;
             } else {
                 if(fromFileIndex < toFileIndex && fromRankIndex < toRankIndex) {
                     for(int i = 1; i <= toFileIndex -fromFileIndex; i++) {
                         if(board[fromRankIndex+i][fromFileIndex+i] != null) {
-                            System.out.println("Cannot create valid path for Bishop.");
-                            return;
+                        	return Errors.InvalidBishopPath;
                         }
                     }
                 } else if(fromFileIndex < toFileIndex && fromRankIndex > toRankIndex) {
                     for(int i = 1; i <= toFileIndex -fromFileIndex; i++) {
                         if(board[fromRankIndex-i][fromFileIndex+i] != null) {
-                            System.out.println("Cannot create valid path for Bishop.");
-                            return;
+                        	return Errors.InvalidBishopPath;
                         }
                     }
                 } else if(fromFileIndex > toFileIndex && fromRankIndex > toRankIndex) {
                     for(int i = 1; i <= fromFileIndex- toFileIndex; i++) {
                         if(board[fromRankIndex-i][fromFileIndex-i] != null) {
-                            System.out.println("Cannot create valid path for Bishop.");
-                            return;
+                        	return Errors.InvalidBishopPath;
                         }
                     }
                 } else if(fromFileIndex > toFileIndex && fromRankIndex < toRankIndex) {
                     for(int i = 1; i <= fromFileIndex- toFileIndex; i++) {
                         if(board[fromRankIndex+i][fromFileIndex-i] != null) {
-                            System.out.println("Cannot create valid path for Bishop.");
-                            return;
+                        	return Errors.InvalidBishopPath;
                         }
                     }
                 }
             }
         } else if (fromPiece.toString().equalsIgnoreCase("q")) {
             if(fromFileIndex == toFileIndex && toRankIndex == fromRankIndex) {
-                System.out.println("Cannot create valid path for Queen.");
-                return;
+            	return Errors.InvalidQueenPath;
             } else if(fromFileIndex == toFileIndex) {
                 if(toRankIndex >fromRankIndex) {
                     for(int i = fromRankIndex+1; i<= toRankIndex; i++) {
                         if(board[i][fromFileIndex] != null) {
-                            System.out.println("Cannot create valid path for Queen.");
-                            return;
+                        	return Errors.InvalidQueenPath;
                         }
                     }
                 } else {
                     for(int i = fromRankIndex-1; i>= toRankIndex; i--) {
                         if(board[i][fromFileIndex] != null) {
-                            System.out.println("Cannot create valid path for Queen.");
-                            return;
+                        	return Errors.InvalidQueenPath;
                         }
                     }
                 }
@@ -182,97 +170,80 @@ public class Chess {
                 if(toFileIndex >fromFileIndex) {
                     for(int i = fromFileIndex+1; i<= toFileIndex; i++) {
                         if(board[fromRankIndex][i] != null) {
-                            System.out.println("Cannot create valid path for Queen.");
-                            return;
+                        	return Errors.InvalidQueenPath;
                         }
                     }
                 } else {
                     for(int i=fromFileIndex-1; i>=fromFileIndex; i--) {
                         if(board[fromRankIndex][i] != null) {
-                            System.out.println("Cannot create valid path for Queen.");
-                            return;
+                        	return Errors.InvalidQueenPath;
                         }
                     }
                 }
             } else if(Math.abs(fromFileIndex- toFileIndex) != Math.abs(fromRankIndex- toRankIndex)) {
-                System.out.println("Cannot create valid path for Queen.");
-                return;
+            	return Errors.InvalidQueenPath;
             } else {
                 if (fromFileIndex < toFileIndex && fromRankIndex < toRankIndex) {
                     for (int i = 1; i <= toFileIndex - fromFileIndex; i++) {
                         if (board[fromRankIndex + i][fromFileIndex + i] != null) {
-                            System.out.println("Cannot create valid path for Queen.");
-                            return;
+                        	return Errors.InvalidQueenPath;
                         }
                     }
                 } else if (fromFileIndex < toFileIndex && fromRankIndex > toRankIndex) {
                     for (int i = 1; i <= toFileIndex - fromFileIndex; i++) {
                         if (board[fromRankIndex - i][fromFileIndex + i] != null) {
-                            System.out.println("Cannot create valid path for Queen.");
-                            return;
+                        	return Errors.InvalidQueenPath;
                         }
                     }
                 } else if (fromFileIndex > toFileIndex && fromRankIndex > toRankIndex) {
                     for (int i = 1; i <= fromFileIndex - toFileIndex; i++) {
                         if (board[fromRankIndex - i][fromFileIndex - i] != null) {
-                            System.out.println("Cannot create valid path for Queen.");
-                            return;
+                        	return Errors.InvalidQueenPath;
                         }
                     }
                 } else if (fromFileIndex > toFileIndex && fromRankIndex < toRankIndex) {
                     for (int i = 1; i <= fromFileIndex - toFileIndex; i++) {
                         if (board[fromRankIndex + i][fromFileIndex - i] != null) {
-                            System.out.println("Cannot create valid path for Queen.");
-                            return;
+                        	return Errors.InvalidQueenPath;
                         }
                     }
                 }
             }
         } else if(fromPiece.toString().equalsIgnoreCase("k")) {
             if(fromFileIndex == toFileIndex && toRankIndex == fromRankIndex) {
-                System.out.println("Cannot create valid path for King.");
-                return;
+            	return Errors.InvalidKingPath;
             } else if (Math.abs(fromFileIndex- toFileIndex) > 1) {
-                System.out.println("Cannot create valid path for King.");
-                return;
+            	return Errors.InvalidKingPath;
             } else if (Math.abs(fromRankIndex- toRankIndex) > 1) {
-                System.out.println("Cannot create valid path for King.");
-                return;
+            	return Errors.InvalidKingPath;
             } else if (board[toRankIndex][toFileIndex] != null) {
-                System.out.println("Cannot create valid path for King.");
-                return;
+            	return Errors.InvalidKingPath;
             }
         } else if (fromPiece.toString().equalsIgnoreCase("p")) {
             if(fromFileIndex != toFileIndex) {
-                System.out.println("Cannot create valid path for Pawn.");
-                return;
+            	return Errors.InvalidPawnPath;
             }
             if(playerTurnIsWhite) {
                 if(fromRankIndex == 6) {
                     int rankDelta = fromRankIndex - toRankIndex;
                     if(rankDelta > 2 || rankDelta < 1) {
-                        System.out.println("Cannot create valid path for Pawn.");
-                        return;
+                    	return Errors.InvalidPawnPath;
                     } else if (rankDelta == 1) {
                         if(board[toRankIndex][toFileIndex] != null) {
-                            System.out.println("Cannot create valid path for Pawn.");
-                            return;
+                        	return Errors.InvalidPawnPath;
                         }
                     } else if (rankDelta == 2) {
                         if(board[toRankIndex][toFileIndex] != null || board[toRankIndex -1][toFileIndex] != null) {
-                            System.out.println("Cannot create valid path for Pawn.");
-                            return;
+                        	return Errors.InvalidPawnPath;
                         }
                     }
                 } else {
                     int rankDelta = fromRankIndex - toRankIndex;
                     if(rankDelta != 1) {
-                        System.out.println("Cannot create valid path for Pawn.");
-                        return;
+                    	return Errors.InvalidPawnPath;
                     } else {
                         if(board[toRankIndex][toFileIndex] != null) {
-                            System.out.println("Cannot create valid path for Pawn.");
-                            return;
+                        	return Errors.InvalidPawnPath;
                         }
                     }
                 }
@@ -280,28 +251,23 @@ public class Chess {
                 if(fromRankIndex == 1) {
                     int rankDelta = fromRankIndex - toRankIndex;
                     if(rankDelta < -2 || rankDelta > -1) {
-                        System.out.println("Cannot create valid path for Pawn.");
-                        return;
+                    	return Errors.InvalidPawnPath;
                     } else if (rankDelta == -1) {
                         if(board[toRankIndex][toFileIndex] != null) {
-                            System.out.println("Cannot create valid path for Pawn.");
-                            return;
+                        	return Errors.InvalidPawnPath;
                         }
                     } else if (rankDelta == -2) {
                         if(board[toRankIndex][toFileIndex] != null || board[toRankIndex +1][toFileIndex] != null) {
-                            System.out.println("Cannot create valid path for Pawn.");
-                            return;
+                        	return Errors.InvalidPawnPath;
                         }
                     }
                 } else {
                     int rankDelta = fromRankIndex - toRankIndex;
                     if(rankDelta != -1) {
-                        System.out.println("Cannot create valid path for Pawn.");
-                        return;
+                    	return Errors.InvalidPawnPath;
                     } else {
                         if(board[toRankIndex][toFileIndex] != null) {
-                            System.out.println("Cannot create valid path for Pawn.");
-                            return;
+                        	return Errors.InvalidPawnPath;
                         }
                     }
                 }
@@ -312,22 +278,18 @@ public class Chess {
         if(fromPiece.toString().equalsIgnoreCase("p")) {
             if(playerTurnIsWhite && toRankIndex == 0) {
                 if(pawnPromotionPiece == null) {
-                    System.out.println("Pawn Promotion Piece must be specified for this pawn move.");
-                    return;
+                	return Errors.PawnPromotionNull;
                 }
                 if(!pawnPromotionPiece.toUpperCase().equals(pawnPromotionPiece)) {
-                    System.out.println("Pawn Promotion Piece must be for White. Input should be uppercase.");
-                    return;
+                	return Errors.PawnPromotionColorError;
                 }
                 fromPiece = Piece.valueOf(pawnPromotionPiece);
             } else if(!playerTurnIsWhite && toRankIndex == 7) {
                 if(pawnPromotionPiece == null) {
-                    System.out.println("Pawn Promotion Piece must be specified for this pawn move.");
-                    return;
+                	return Errors.PawnPromotionNull;
                 }
                 if(!pawnPromotionPiece.toLowerCase().equals(pawnPromotionPiece)) {
-                    System.out.println("Pawn Promotion Piece must be for Black. Input should be lowercase.");
-                    return;
+                	return Errors.PawnPromotionColor2Error;
                 }
                 fromPiece = Piece.valueOf(pawnPromotionPiece);
             }
@@ -339,25 +301,24 @@ public class Chess {
 
         //Change the player's turn
         playerTurnIsWhite = !playerTurnIsWhite;
+        
+        return Errors.GoodMove;
     }
 
-    private void validateRookMove(int toFileIndex, int toRankIndex, int fromFileIndex, int fromRankIndex) {
+    private Errors validateRookMove(int toFileIndex, int toRankIndex, int fromFileIndex, int fromRankIndex) {
         if(fromFileIndex == toFileIndex && toRankIndex == fromRankIndex) {
-            System.out.println("Rook must move at least 1 square.");
-            return;
+            return Errors.RookNotMoving;
         } else if(fromFileIndex == toFileIndex) {
             if(toRankIndex > fromRankIndex) {
                 for(int i = fromRankIndex +1; i<= toRankIndex; i++) {
                     if(board[i][fromFileIndex] != null) {
-                        System.out.println("Cannot create valid path for Rook.");
-                        return;
+                        return Errors.InvalideRookPath;
                     }
                 }
             } else {
                 for(int i = fromRankIndex -1; i>= toRankIndex; i--) {
                     if(board[i][fromFileIndex] != null) {
-                        System.out.println("Cannot create valid path for Rook.");
-                        return;
+                    	return Errors.InvalideRookPath;
                     }
                 }
             }
@@ -365,22 +326,20 @@ public class Chess {
             if(toFileIndex > fromFileIndex) {
                 for(int i = fromFileIndex +1; i<= toFileIndex; i++) {
                     if(board[fromRankIndex][i] != null) {
-                        System.out.println("Cannot create valid path for Rook.");
-                        return;
+                    	return Errors.InvalideRookPath;
                     }
                 }
             } else {
                 for(int i = fromFileIndex -1; i>= fromFileIndex; i--) {
                     if(board[fromRankIndex][i] != null) {
-                        System.out.println("Cannot create valid path for Rook.");
-                        return;
+                    	return Errors.InvalideRookPath;
                     }
                 }
             }
         } else {
-            System.out.println("Cannot create valid path for Rook.");
-            return;
+        	return Errors.InvalideRookPath;
         }
+        return Errors.GoodMove;
     }
 
     private boolean correctPlayerNotMovingTheirPiece(Piece fromPiece) {
@@ -401,37 +360,192 @@ public class Chess {
 
     // TODO: Homework - Refactor this method to use a single parameter
 
-    private void capturePiece(int fromFileIndex, int fromRankIndex, int toFileIndex, int toRankIndex, String pawnPromotionPiece) {
+    //add pawn promotion
+    private Errors capturePiece(Move m) {
+    	
+    	int fromFileIndex = m.startFile;
+    	int fromRankIndex = m.startRank;
+    	int toFileIndex = m.endFile;
+    	int toRankIndex = m.endRank;
+    	String pawnPromotionPiece = m.promotionPiece;
+    	
         Piece fromPiece = board[fromRankIndex][fromFileIndex];
+        
+        if(fromPiece == null) {
+            return Errors.NoPieceSelected;
+        }
+        
+        if (correctPlayerNotMovingTheirPiece(fromPiece)) return Errors.WrongPlayerMovingPiece;
+        
+
+        //Validate Piece Movement
+        if(fromPiece.toString().equalsIgnoreCase("n")) {
+            if (!((Math.abs(fromFileIndex - toFileIndex) == 2 && Math.abs(fromRankIndex - toRankIndex) == 1) || (Math.abs(fromFileIndex - toFileIndex) == 1 && Math.abs(fromRankIndex - toRankIndex) == 2))) {
+                return Errors.InvalidKnightMove;
+            }
+        } else if(fromPiece.toString().equalsIgnoreCase("r")) {
+            Errors rook = validateRookMove(toFileIndex, toRankIndex, fromFileIndex, fromRankIndex);
+            if(rook != Errors.GoodMove)
+            return rook;
+        } else if(fromPiece.toString().equalsIgnoreCase("b")) {
+            if(fromFileIndex == toFileIndex || toRankIndex == fromRankIndex) {
+            	return Errors.InvalidBishopPath;
+            } else if(Math.abs(fromFileIndex- toFileIndex) != Math.abs(fromRankIndex- toRankIndex)) {
+            	return Errors.InvalidBishopPath;
+            } else {
+                if(fromFileIndex < toFileIndex && fromRankIndex < toRankIndex) {
+                    for(int i = 1; i <= toFileIndex -fromFileIndex; i++) {
+                        if(board[fromRankIndex+i][fromFileIndex+i] != null) {
+                        	return Errors.InvalidBishopPath;
+                        }
+                    }
+                } else if(fromFileIndex < toFileIndex && fromRankIndex > toRankIndex) {
+                    for(int i = 1; i <= toFileIndex -fromFileIndex; i++) {
+                        if(board[fromRankIndex-i][fromFileIndex+i] != null) {
+                        	return Errors.InvalidBishopPath;
+                        }
+                    }
+                } else if(fromFileIndex > toFileIndex && fromRankIndex > toRankIndex) {
+                    for(int i = 1; i <= fromFileIndex- toFileIndex; i++) {
+                        if(board[fromRankIndex-i][fromFileIndex-i] != null) {
+                        	return Errors.InvalidBishopPath;
+                        }
+                    }
+                } else if(fromFileIndex > toFileIndex && fromRankIndex < toRankIndex) {
+                    for(int i = 1; i <= fromFileIndex- toFileIndex; i++) {
+                        if(board[fromRankIndex+i][fromFileIndex-i] != null) {
+                        	return Errors.InvalidBishopPath;
+                        }
+                    }
+                }
+            }
+        } else if (fromPiece.toString().equalsIgnoreCase("q")) {
+            if(fromFileIndex == toFileIndex && toRankIndex == fromRankIndex) {
+            	return Errors.InvalidQueenPath;
+            } else if(fromFileIndex == toFileIndex) {
+                if(toRankIndex >fromRankIndex) {
+                    for(int i = fromRankIndex+1; i<= toRankIndex; i++) {
+                        if(board[i][fromFileIndex] != null) {
+                        	return Errors.InvalidQueenPath;
+                        }
+                    }
+                } else {
+                    for(int i = fromRankIndex-1; i>= toRankIndex; i--) {
+                        if(board[i][fromFileIndex] != null) {
+                        	return Errors.InvalidQueenPath;
+                        }
+                    }
+                }
+            } else if(fromRankIndex == toRankIndex){
+                if(toFileIndex >fromFileIndex) {
+                    for(int i = fromFileIndex+1; i<= toFileIndex; i++) {
+                        if(board[fromRankIndex][i] != null) {
+                        	return Errors.InvalidQueenPath;
+                        }
+                    }
+                } else {
+                    for(int i=fromFileIndex-1; i>=fromFileIndex; i--) {
+                        if(board[fromRankIndex][i] != null) {
+                        	return Errors.InvalidQueenPath;
+                        }
+                    }
+                }
+            } else if(Math.abs(fromFileIndex- toFileIndex) != Math.abs(fromRankIndex- toRankIndex)) {
+            	return Errors.InvalidQueenPath;
+            } else {
+                if (fromFileIndex < toFileIndex && fromRankIndex < toRankIndex) {
+                    for (int i = 1; i <= toFileIndex - fromFileIndex; i++) {
+                        if (board[fromRankIndex + i][fromFileIndex + i] != null) {
+                        	return Errors.InvalidQueenPath;
+                        }
+                    }
+                } else if (fromFileIndex < toFileIndex && fromRankIndex > toRankIndex) {
+                    for (int i = 1; i <= toFileIndex - fromFileIndex; i++) {
+                        if (board[fromRankIndex - i][fromFileIndex + i] != null) {
+                        	return Errors.InvalidQueenPath;
+                        }
+                    }
+                } else if (fromFileIndex > toFileIndex && fromRankIndex > toRankIndex) {
+                    for (int i = 1; i <= fromFileIndex - toFileIndex; i++) {
+                        if (board[fromRankIndex - i][fromFileIndex - i] != null) {
+                        	return Errors.InvalidQueenPath;
+                        }
+                    }
+                } else if (fromFileIndex > toFileIndex && fromRankIndex < toRankIndex) {
+                    for (int i = 1; i <= fromFileIndex - toFileIndex; i++) {
+                        if (board[fromRankIndex + i][fromFileIndex - i] != null) {
+                        	return Errors.InvalidQueenPath;
+                        }
+                    }
+                }
+            }
+        } else if(fromPiece.toString().equalsIgnoreCase("k")) {
+            if(fromFileIndex == toFileIndex && toRankIndex == fromRankIndex) {
+            	return Errors.InvalidKingPath;
+            } else if (Math.abs(fromFileIndex- toFileIndex) > 1) {
+            	return Errors.InvalidKingPath;
+            } else if (Math.abs(fromRankIndex- toRankIndex) > 1) {
+            	return Errors.InvalidKingPath;
+            } else if (board[toRankIndex][toFileIndex] != null) {
+            	return Errors.InvalidKingPath;
+            }
+        } else if (fromPiece.toString().equalsIgnoreCase("p")) {
+            if(Math.abs(toRankIndex - toFileIndex) != 1) {
+            	return Errors.InvalidPawnPath;
+            }
+            if(playerTurnIsWhite) {
+            	int rankDelta = fromRankIndex - toRankIndex;
+                if(rankDelta != 1) {
+                	return Errors.InvalidPawnPath;
+                } else {
+                	if(board[toRankIndex][toFileIndex + 1] == null || board[toRankIndex][toFileIndex - 1] == null) {
+                		return Errors.InvalidPawnPath;
+                    }
+                }
+            } else {
+            	int rankDelta = fromRankIndex - toRankIndex;
+                if(rankDelta != -1) {
+                	return Errors.InvalidPawnPath;
+                } else {
+                    if(board[toRankIndex][toFileIndex - 1] == null || board[toRankIndex][toFileIndex + 1] == null) {
+
+                        return Errors.InvalidPawnPath;
+                    }
+                }
+            }
+        }
+
+      //Handle the promotion of a pawn.
+        if(fromPiece.toString().equalsIgnoreCase("p")) {
+            if(playerTurnIsWhite && toRankIndex == 0) {
+                if(pawnPromotionPiece == null) {
+                	return Errors.PawnPromotionNull;
+                }
+                if(!pawnPromotionPiece.toUpperCase().equals(pawnPromotionPiece)) {
+                	return Errors.PawnPromotionColorError;
+                }
+                fromPiece = Piece.valueOf(pawnPromotionPiece);
+            } else if(!playerTurnIsWhite && toRankIndex == 7) {
+                if(pawnPromotionPiece == null) {
+                	return Errors.PawnPromotionNull;
+                }
+                if(!pawnPromotionPiece.toLowerCase().equals(pawnPromotionPiece)) {
+                	return Errors.PawnPromotionColor2Error;
+                }
+                fromPiece = Piece.valueOf(pawnPromotionPiece);
+            }
+        }
+
+
         
         Piece toPiece = board[toRankIndex][toFileIndex];
         
         if(toPiece == null) {
         	board[toRankIndex][toFileIndex] = fromPiece;
             board[fromRankIndex][fromFileIndex] = null;
-            return;
+            return Errors.PieceNotCaptured;
         }
         
-        int team = 0;
-
-        switch(fromPiece) {
-        case P:
-        case N:
-        case B:
-        case K:
-        case Q:
-        case R:
-        	team = 0;
-        	break;
-        case p:
-        case n:
-        case b:
-        case r:
-        case k:
-        case q:
-        	team = 1;
-        	break;
-        }
         
         switch(toPiece) {
         case P:
@@ -440,7 +554,7 @@ public class Chess {
         case K:
         case Q:
         case R:
-        	if(team != 0) {
+        	if(!playerTurnIsWhite) {
         		board[toRankIndex][toFileIndex] = fromPiece;
                 board[fromRankIndex][fromFileIndex] = null;
         	}
@@ -451,22 +565,18 @@ public class Chess {
         case r:
         case k:
         case q:
-        	if(team != 1) {
+        	if(playerTurnIsWhite) {
         		board[toRankIndex][toFileIndex] = fromPiece;
                 board[fromRankIndex][fromFileIndex] = null;
         	}
         	break;
         }
-        // TODO: Homework - Create capture logic when a piece is capturing another piece
-        //           Remember: Pieces can only capture opposing pieces
-        //                     Pawns can only capture diagonally in front of them
-        //                     We are not worrying about en passant. This is just the simple and basic moves.
-        //           Use inspiration from the move method. Think about what can be refactored.
-        //                     Extract method is your friend.
-
-
-        //Move piece, if the move is allowed.
         
+
+        //Change the player's turn
+        playerTurnIsWhite = !playerTurnIsWhite;
+        
+        return Errors.GoodMove;
     }
 
     private static int calcFileIndex(Character file) {
